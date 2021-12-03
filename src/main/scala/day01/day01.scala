@@ -5,8 +5,8 @@ import scala.io.Source
 @main
 def main(): Unit = {
   val list = Source.fromResource("day01input.sweeps").getLines().map(_.toInt).toList
-  println(s"non windowed : ${extractIncreased(list)}")
-  println(s"windowed     : ${extractIncreased(getWindowed(list))}")
+  println(s"increasings in original measurements: ${extractIncreased(list)}")
+  println(s"increasings in windowed measurements: ${extractIncreased(getWindowed(list))}")
 }
 
 def extractIncreased(measurements: List[Int]): Int = {
