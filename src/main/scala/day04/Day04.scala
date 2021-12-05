@@ -10,56 +10,71 @@ def main() = {
   val winningBoardAndWinningNumber = findWinningBoard(bingoInput)
   val score = getBoardScore(winningBoardAndWinningNumber)
   println(s"The score of the winning board is $score and the winning number was ${winningBoardAndWinningNumber.number}")
+
+  val losingBoardAndLastWinningNumber = findLastWinningBoard(bingoInput)
+  val score2 = getBoardScore(losingBoardAndLastWinningNumber)
+  println(s"The score of the last winning board is $score2 and the last winning number was ${losingBoardAndLastWinningNumber.number}")
 }
 
-def getBoardScore(winningBoardAndWinningNumber: WinningBoardAndWinningNumber) = {
-  println("the winning board is:")
-  winningBoardAndWinningNumber.board.lines.foreach(l => println(printLine(l)))
-  val nonMarkedNumbers = for {
-    line <- winningBoardAndWinningNumber.board.lines
-    boardNumber <- line
-    if !boardNumber.isMarked
-  } yield boardNumber
-  nonMarkedNumbers.map(_.number).sum * winningBoardAndWinningNumber.number
-}
-
-def printLine(line: List[BoardNumber]) = {
+def printBoardLine(line: List[BoardNumber]) =
   line.map(bn => if (bn.isMarked) "xx" else bn.number.toString).mkString(" ")
+
+// Side effecting function that returns a modified version of the parameter.
+def markBoardsWithNumber(boards: List[Board], n: Int) = {
+  boards.foreach(
+    _.lines.foreach(
+      _.foreach(bn => if (bn.number == n) bn.mark())))
+  boards
 }
 
-def findWinningBoard(bingoInput: BingoInput): WinningBoardAndWinningNumber = {
+// returns true if the given board is a winning one
+def isWinningBoard(board: Board): Boolean = {
+  val isLineBingo = board.lines.exists(_.forall(_.isMarked))
 
-  def markBoardsWithNumber(boards: List[Board], n: Int) = {
-    boards.foreach(
-      _.lines.foreach(
-        _.foreach(bn => if (bn.number == n) bn.mark())))
-    boards
+  // pure brutality
+  var isColumnBingo = false
+  for (i <- 0 until 5) {
+    val column = for {
+      line <- board.lines
+    } yield line(i)
+    isColumnBingo = isColumnBingo || column.forall(_.isMarked)
   }
 
-  def findWinningBoard(boards: List[Board]): Option[Board] =
-    boards.find(board => {
-      val isLineBingo = board.lines.exists(_.forall(_.isMarked))
+  isColumnBingo || isLineBingo
+}
 
-      // pure brutality
-      var isColumnBingo = false
-      for (i <- 0 until 5) {
-        val column = for {
-          line <- board.lines
-        } yield line(i)
-        isColumnBingo = isColumnBingo || column.forall(_.isMarked)
-      }
-
-      isColumnBingo || isLineBingo
-
-    })
+def findLastWinningBoard(bingoInput: BingoInput): SelectedBoardAndNumber = {
 
   @tailrec
-  def findWinningBoardRec(markedBoardsSoFar: List[Board], remainingNumbers: List[Int]): WinningBoardAndWinningNumber = {
+  def removeWinningBoardRec(remainingBoards: List[Board], remainingNumbers: List[Int]): SelectedBoardAndNumber = {
+    remainingNumbers match {
+      case n :: tailn =>
+        val markedBoards = markBoardsWithNumber(remainingBoards, n)
+        markedBoards match {
+          case lastBoard :: Nil =>
+            if isWinningBoard(lastBoard) then SelectedBoardAndNumber(lastBoard, n)
+            else removeWinningBoardRec(markedBoards, tailn)
+          case oneBoard :: otherBoards =>
+            val updatedRemainingBoards = markedBoards.filterNot(isWinningBoard)
+            removeWinningBoardRec(updatedRemainingBoards, tailn)
+          case Nil => throw Exception("maybe two boards were losing at the same time")
+        }
+      case Nil => throw Exception("no losing boards!")
+    }
+  }
+
+  removeWinningBoardRec(bingoInput.boards, bingoInput.extractedNumbers)
+}
+
+def findWinningBoard(bingoInput: BingoInput): SelectedBoardAndNumber = {
+
+  @tailrec
+  def findWinningBoardRec(markedBoardsSoFar: List[Board], remainingNumbers: List[Int]): SelectedBoardAndNumber = {
     remainingNumbers match {
       case head :: tail =>
         val markedBoards = markBoardsWithNumber(markedBoardsSoFar, head)
-        findWinningBoard(markedBoards) match {
-          case Some(winningBoard) => WinningBoardAndWinningNumber(winningBoard, head)
+        markedBoards.find(board => isWinningBoard(board)) match {
+          case Some(winningBoard) => SelectedBoardAndNumber(winningBoard, head)
           case None => findWinningBoardRec(markedBoards, tail)
         }
       case Nil => throw Exception("No winning board")
@@ -99,6 +114,17 @@ def parseInput(resourceName: String): BingoInput = {
   BingoInput(extractedNumbers, boards)
 }
 
+def getBoardScore(selectedBoard: SelectedBoardAndNumber) = {
+  println(s"the selected number is ${selectedBoard.number} and the selected board is:")
+  selectedBoard.board.lines.foreach(l => println(printBoardLine(l)))
+  val nonMarkedNumbers = for {
+    line <- selectedBoard.board.lines
+    boardNumber <- line
+    if !boardNumber.isMarked
+  } yield boardNumber
+  nonMarkedNumbers.map(_.number).sum * selectedBoard.number
+}
+
 case class BoardNumber(number: Int, var isMarked: Boolean = false) {
   def mark() = this.isMarked = true
 }
@@ -107,4 +133,4 @@ case class Board(lines: List[List[BoardNumber]])
 
 case class BingoInput(extractedNumbers: List[Int], boards: List[Board])
 
-case class WinningBoardAndWinningNumber(board: Board, number: Int)
+case class SelectedBoardAndNumber(board: Board, number: Int)
