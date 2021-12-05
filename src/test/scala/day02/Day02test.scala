@@ -3,8 +3,6 @@ package day02
 import org.scalatest.wordspec.AnyWordSpec
 import Directions.*
 
-import javax.tools.ForwardingFileObject
-
 class Day02test extends AnyWordSpec {
   "The Delta extraction function" should {
     "extract deltas correctly" in {
